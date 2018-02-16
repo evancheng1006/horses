@@ -1,0 +1,98 @@
+<html>
+<head>
+<meta charset="UTF-8" />
+</head>
+<body>
+</body>
+</html>
+
+<script>
+var myGamePiece;
+var myGameArea = {
+    canvas : document.createElement("canvas"),
+    start : function() {
+        this.width = 5;
+        this.height = 4;
+        this.blocksize = 100;
+        this.linewidth = 10;
+        this.linecolor = "black";
+        this.emptycolor = "white";
+        this.candidatecolor = "yellow";
+        this.initCanvas();
+        
+    },
+    initCanvas : function() {
+        this.canvas.width = this.blocksize * this.width;
+        this.canvas.height = this.blocksize * this.height;
+        this.context = this.canvas.getContext("2d");
+        document.body.insertBefore(this.canvas, document.body.childNodes[0]);
+        this.background = new component(this.canvas.width, this.canvas.height, this.linecolor, 0, 0);
+        this.entryPosition = get2DArray(this.width, this.height);
+        this.entryCanvas = get2DArray(this.width, this.height);
+        for (var i = 0; i < this.height; i++) {
+            for (var j = 0; j < this.width; j++) {
+                this.entryPosition[i][j] = {x: j * this.blocksize + this.linewidth/2, y: i * this.blocksize + this.linewidth/2};
+                this.entryCanvas[i][j] = new component(this.blocksize-this.linewidth, this.blocksize-this.linewidth, this.emptycolor, this.entryPosition[i][j].x, this.entryPosition[i][j].y);
+            }
+        }
+        this.entryCanvas[2][0].color = this.candidatecolor;
+        this.boardData = get2DArray(this.width, this.height);
+        this.updateCanvas();
+        console.log(this.entryPosition);
+    },
+    updateCanvas : function() {
+        this.clear();
+        this.background.update();
+        for (var i = 0; i < this.height; i++) {
+            for (var j = 0; j < this.width; j++) {
+                this.entryCanvas[i][j].update();
+            }
+        }
+    },
+    clear : function() {
+        this.context.clearRect(0, 0, this.canvas.width, this.canvas.height);
+    }
+}
+
+function startGame() {
+    myGameArea.start();
+
+}
+function get2DArray(width, height) {
+        var ret = [];
+        for (var i = 0; i < height; i++) {
+            tmp = [];
+            for (var j = 0; j < width; j++) {
+                tmp.push(0);
+            }
+            ret.push(tmp);
+        }
+        return ret;
+}
+
+
+
+
+
+function component(width, height, color, x, y) {
+    this.width = width;
+    this.height = height;
+    this.x = x;
+    this.y = y;
+    this.color = color;
+    //ctx = myGameArea.context;
+    //ctx.fillStyle = this.color;
+    //ctx.fillRect(this.x, this.y, this.width, this.height);
+    this.update = function(){
+        ctx = myGameArea.context;
+        ctx.fillStyle = this.color;
+        ctx.fillRect(this.x, this.y, this.width, this.height);
+    }
+}
+
+
+
+
+startGame();
+</script>
+
