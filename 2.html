@@ -7,22 +7,25 @@
 <br>
 <br>
 <canvas id="canvas"></canvas><br>
-<h1>Horses!</h1><br>
-<h2><a id="msg"></h2><br>
-<h2><a id="status"></h2><br>
 Map:
 <select id="map">
 <option value="classic" selected>Classic</option>
 <option value="war" >War</option>
 <option value="wrecked" >Wrecked</option>
-</select><br>
+</select>
 <button id="restart">Restart!</button><br>
+<button id="undo">Undo</button><br>
+<h1>Horses!</h1>
+<h2><a id="msg"></h2>
+<h2><a id="status"></h2>
+<h1>History:</h1>
+<h2><a id="history"></h2>
+<br>
 
 </body>
 </html>
 
 <script>
-
 var mapData = {
     "classic" : {
         width : 4,
@@ -76,10 +79,10 @@ var myGameArea = {
         this.currentPlayer = 1;
         this.initBoardData();
         this.initCanvas();
-        
     },
     initBoardData : function() {
         this.gameStatus = "continue";
+        this.history = [];
         this.boardData = JSON.parse(JSON.stringify(this.map.boardData)); // copy array by value
     },
     initCanvas : function() {
@@ -233,6 +236,11 @@ var myGameArea = {
             default:
                 break;
         }
+        var tmp = '';
+        for (var i = this.history.length; i > 0; i--) {
+            tmp += "Move " + i + ": " + this.history[i-1].str + "<br>";
+        }
+        document.getElementById("history").innerHTML = tmp;
     },
     playerMove : function(cmd) {
         console.log("playerMove");
@@ -248,6 +256,14 @@ var myGameArea = {
             console.log("invalid command: not correct player");
             return false;
         }
+        cmd.player = this.currentPlayer;
+        // valid
+        //"%d: (%d,%d) -> (%d,%d)", cmd.from.x
+        cmd.str = cmd.player + ': ';
+        cmd.str += '(' + cmd.from.x + ',' + cmd.from.y + ')';
+        cmd.str += ' -> ';
+        cmd.str += '(' + cmd.to.x + ',' + cmd.to.y + ')';
+        this.history.push(cmd);
         this.boardData[cmd.to.y][cmd.to.x] = this.boardData[cmd.from.y][cmd.from.x];
         this.boardData[cmd.from.y][cmd.from.x] = 0;
         switch (this.currentPlayer) {
@@ -263,6 +279,27 @@ var myGameArea = {
         console.log("currentPlayer = %d", this.currentPlayer);
         this.gameStatus = getGameStatus(this.currentPlayer, this.boardData, this.width, this.height);
         return true;
+    },
+    playerUndo : function() {
+        if (this.history.length > 0) {
+            var cmd = this.history.pop();
+            this.boardData[cmd.from.y][cmd.from.x] = this.boardData[cmd.to.y][cmd.to.x];
+            this.boardData[cmd.to.y][cmd.to.x] = 0;
+            switch (this.currentPlayer) {
+                case 1:
+                    this.currentPlayer = 2;
+                    break;
+                case 2:
+                    this.currentPlayer = 1;
+                    break;
+                default:
+                    break;
+            }
+        console.log("currentPlayer = %d", this.currentPlayer);
+        } else {
+            console.log("No moves");
+        }
+        this.update();
     },
     clear : function() {
         this.context.clearRect(0, 0, this.canvas.width, this.canvas.height);
@@ -301,7 +338,9 @@ function getGameStatus(currentPlayer, boardData, width, height) {
 
 function startGame() {
     myGameArea.start();
-
+}
+function undo() {
+    myGameArea.playerUndo();
 }
 function draw() {
     var pos = getMousePos(canvas);
@@ -462,6 +501,8 @@ function mouseDownHandler(evt, gameArea) {
     gameArea.update();
 }
 function getMouseRelativePosition(evt, gameArea) {
+    var rect = this.canvas.getBoundingClientRect();
+    gameArea.canvasOffset = {x:rect.left, y:rect.top};
     var pos = {x: evt.clientX - gameArea.canvasOffset.x, y: evt.clientY - gameArea.canvasOffset.y};
     return pos;
 }
@@ -508,6 +549,7 @@ function circle(radius, color, centerX, centerY) {
 
 
 document.getElementById("restart").onclick = startGame;
+document.getElementById("undo").onclick = undo;
 document.getElementById("map").value = "classic"; // default value
 startGame();
 </script>
