@@ -1,77 +1,443 @@
 <html>
 <head>
 <meta charset="UTF-8" />
+
 </head>
 <body>
+<br>
+<br>
+<canvas id="canvas"></canvas><br>
+<h1>Horses!</h1><br>
+<h2><a id="msg"></h2><br>
+<h2><a id="status"></h2><br>
+<button onclick="startGame();">Restart!</button><br>
 </body>
 </html>
 
 <script>
 var myGamePiece;
 var myGameArea = {
-    canvas : document.createElement("canvas"),
+    canvas : document.getElementById("canvas"),
     start : function() {
         this.width = 5;
         this.height = 4;
-        this.blocksize = 100;
-        this.linewidth = 10;
-        this.linecolor = "black";
-        this.emptycolor = "white";
-        this.candidatecolor = "yellow";
+        this.blockSize = 100;
+        this.lineWidth = 5;
+        this.marginColor = "black";
+        this.emptyColor = "white";
+        this.availableMoveColor = "cyan";
+        this.entryHighlightColor = "yellow";
+        this.selectedColor = "green";
+        this.player1Color = "blue";
+        this.player2Color = "red";
+        this.currentPlayer = 1;
+        this.initBoardData();
         this.initCanvas();
         
     },
+    initBoardData : function() {
+        this.gameStatus = "continue";
+        this.boardData = get2DArray(this.width, this.height);
+        this.boardData[0][0] = 1;
+        this.boardData[0][1] = 1;
+        this.boardData[1][0] = 1;
+        this.boardData[1][1] = 1;
+        this.boardData[2][2] = 2;
+        this.boardData[2][3] = 2;
+        this.boardData[3][2] = 2;
+        this.boardData[3][3] = 2;
+    },
     initCanvas : function() {
-        this.canvas.width = this.blocksize * this.width;
-        this.canvas.height = this.blocksize * this.height;
+        this.canvas.width = this.blockSize * this.width;
+        this.canvas.height = this.blockSize * this.height;
         this.context = this.canvas.getContext("2d");
-        document.body.insertBefore(this.canvas, document.body.childNodes[0]);
-        this.background = new component(this.canvas.width, this.canvas.height, this.linecolor, 0, 0);
-        this.entryPosition = get2DArray(this.width, this.height);
+        //document.body.insertBefore(this.canvas, document.body.childNodes[0]);
+        var rect = this.canvas.getBoundingClientRect();
+        this.canvasOffset = {x:rect.left, y:rect.top}
+        this.canvas.onmousemove = function(evt) {
+            mouseMoveHandler(evt, myGameArea);
+        }
+        this.canvas.onmouseover = function(evt) {
+            mouseOverHandler(evt, myGameArea);
+        }
+        this.canvas.onmousedown = function(evt) {
+	    mouseDownHandler(evt, myGameArea);
+        }
+
+        this.mouseEntry = {x:-1, y:-1, valid:false};
+        this.entrySelected = {x:-1, y:-1, valid:false};
+        //console.log(this.canvasOffset);
+
         this.entryCanvas = get2DArray(this.width, this.height);
+        this.entryMarginCanvas = get2DArray(this.width, this.height);
+        this.playerCanvas = get2DArray(this.width, this.height);
         for (var i = 0; i < this.height; i++) {
             for (var j = 0; j < this.width; j++) {
-                this.entryPosition[i][j] = {x: j * this.blocksize + this.linewidth/2, y: i * this.blocksize + this.linewidth/2};
-                this.entryCanvas[i][j] = new component(this.blocksize-this.linewidth, this.blocksize-this.linewidth, this.emptycolor, this.entryPosition[i][j].x, this.entryPosition[i][j].y);
+                this.entryCanvas[i][j] = new component(
+                    this.blockSize-2*this.lineWidth,
+                    this.blockSize-2*this.lineWidth,
+                    this.emptyColor,
+                    j * this.blockSize + this.lineWidth,
+                    i * this.blockSize + this.lineWidth);
+                this.entryMarginCanvas[i][j] = new component(
+                    this.blockSize,
+                    this.blockSize,
+                    this.marginColor,
+                    j * this.blockSize,
+                    i * this.blockSize);
+                this.playerCanvas[i][j] = new circle(
+                    this.blockSize / 3,
+                    this.emptyColor,
+                    j * this.blockSize + this.blockSize / 2,
+                    i * this.blockSize + this.blockSize / 2);
             }
         }
-        this.entryCanvas[2][0].color = this.candidatecolor;
-        this.boardData = get2DArray(this.width, this.height);
-        this.updateCanvas();
-        console.log(this.entryPosition);
+        //this.entryMarginCanvas[2][0].color = this.candidatecolor;
+        this.availableMove = getAvailableMove(this.entrySelected, this.boardData);
+        this.update();
     },
-    updateCanvas : function() {
+    update : function() {
+        //console.log(this.mouseEntry);
+        //console.log(this.entrySelected);
+        if (this.mouseEntry.valid) {
+            for (var i = 0; i < this.height; i++) {
+                for (var j = 0; j < this.width; j++) {
+                    this.entryMarginCanvas[i][j].color = this.marginColor;
+                }
+            }
+            var x = parseInt(this.mouseEntry.x);
+            var y = parseInt(this.mouseEntry.y);
+            this.entryMarginCanvas[y][x].color = this.entryHighlightColor;
+        }
+        for (var i = 0; i < this.height; i++) {
+            for (var j = 0; j < this.width; j++) {
+                this.entryCanvas[i][j].color = this.emptyColor;
+            }
+        }
+        for (var i = 0; i < this.height; i++) {
+            for (var j = 0; j < this.width; j++) {
+                switch (this.boardData[i][j]) {
+                    case 0:
+                        this.playerCanvas[i][j].color = this.emptyColor;
+                        break;
+                    case 1:
+                        this.playerCanvas[i][j].color = this.player1Color;
+                        break;
+                    case 2:
+                        this.playerCanvas[i][j].color = this.player2Color;
+                        break;
+                    default:
+                        this.playerCanvas[i][j].color = this.emptyColor;
+                        break;
+                }
+            }
+        }
+        if (this.entrySelected.valid) {
+            var x = parseInt(this.entrySelected.x);
+            var y = parseInt(this.entrySelected.y);
+            this.entryCanvas[y][x].color = this.selectedColor;
+            // in fact, only if playerCanvas[y][x] != 0 the color will not be selected
+            if (this.boardData[y][x] == 0) {
+                this.playerCanvas[y][x].color = this.selectedColor;
+            }
+        }
+        for (var i = 0; i < this.availableMove.length; i++) {
+            var x = parseInt(this.availableMove[i].x);
+            var y = parseInt(this.availableMove[i].y);
+            this.entryCanvas[y][x].color = this.availableMoveColor;
+            this.playerCanvas[y][x].color = this.availableMoveColor;
+        }
+
+        /////////////////////////////
         this.clear();
-        this.background.update();
+        for (var i = 0; i < this.height; i++) {
+            for (var j = 0; j < this.width; j++) {
+                this.entryMarginCanvas[i][j].update();
+            }
+        }
         for (var i = 0; i < this.height; i++) {
             for (var j = 0; j < this.width; j++) {
                 this.entryCanvas[i][j].update();
             }
         }
+        for (var i = 0; i < this.height; i++) {
+            for (var j = 0; j < this.width; j++) {
+                //console.log(this.playerCanvas[i][j]);
+                this.playerCanvas[i][j].update();
+            }
+        }
+        //
+        var msg = document.getElementById("msg");
+        switch (this.currentPlayer) {
+            case 1:
+                msg.innerHTML = "Player 1's Turn";
+                msg.style.color = this.player1Color;
+                break;
+            case 2:
+                msg.innerHTML = "Player 2's Turn";
+                msg.style.color = this.player2Color;
+                break;
+            default:
+                break;
+        }
+        var status = document.getElementById("status");
+        switch (this.gameStatus) {
+            case "continue":
+                status.innerHTML = "";
+                break;
+            case "1":
+                status.innerHTML = "Player 1 Wins!";
+                break;
+            case "2":
+                status.innerHTML = "Player 2 Wins!";
+                break;          
+            default:
+                break;
+        }
+    },
+    playerMove : function(cmd) {
+        console.log("playerMove");
+        console.log(cmd);
+        if (cmd.from.x < 0 || cmd.from.x >= this.width ||
+            cmd.from.y < 0 || cmd.from.y >= this.height ||
+            cmd.to.x < 0 || cmd.to.x >= this.width ||
+            cmd.to.y < 0 || cmd.to.y >= this.height) {
+            console.log("invalid command: index out of range");
+            return false;
+        }
+        if (this.boardData[cmd.from.y][cmd.from.x] != this.currentPlayer) {
+            console.log("invalid command: not correct player");
+            return false;
+        }
+        this.boardData[cmd.to.y][cmd.to.x] = this.boardData[cmd.from.y][cmd.from.x];
+        this.boardData[cmd.from.y][cmd.from.x] = 0;
+        switch (this.currentPlayer) {
+            case 1:
+                this.currentPlayer = 2;
+                break;
+            case 2:
+                this.currentPlayer = 1;
+                break;
+            default:
+                break;
+        }
+        console.log("currentPlayer = %d", this.currentPlayer);
+        this.gameStatus = getGameStatus(this.currentPlayer, this.boardData, this.width, this.height);
+        return true;
     },
     clear : function() {
         this.context.clearRect(0, 0, this.canvas.width, this.canvas.height);
     }
+}
+function getGameStatus(currentPlayer, boardData, width, height) {
+    //console.log("getGameStatus");
+    //console.log(currentPlayer);
+    //console.log(boardData);
+    //console.log(width);
+    //console.log(height);
+    var availableMoveCount = 0;
+    for (var y = 0; y < height; y++) {
+        for (var x = 0; x < width; x++) {
+            if (boardData[y][x] == currentPlayer) {
+                var moves = getAvailableMove({x:x,y:y,valid:true},
+                                             boardData,
+                                             width,
+                                             height);
+                availableMoveCount += moves.length;
+                //console.log({x:x,y:y});
+                //console.log(moves);
+            }
+        }
+    }
+    //console.log(availableMoveCount);
+    if (availableMoveCount <= 0) {
+        if (currentPlayer == 2) {
+            return "1";
+        } else if (currentPlayer == 1) {
+            return "2";
+        }
+    }
+    return "continue";
 }
 
 function startGame() {
     myGameArea.start();
 
 }
-function get2DArray(width, height) {
-        var ret = [];
-        for (var i = 0; i < height; i++) {
-            tmp = [];
-            for (var j = 0; j < width; j++) {
-                tmp.push(0);
-            }
-            ret.push(tmp);
+function draw() {
+    var pos = getMousePos(canvas);
+    //console.log(pos);
+    context.fillStyle = "#000000";
+    context.fillRect (pos.x, pos.y, 4, 4);
+}
+function getMousePos(canvas) {
+// https://stackoverflow.com/questions/17130395/real-mouse-position-in-canvas
+    var rect = this.canvas.getBoundingClientRect();
+    return {
+      x: evt.clientX - rect.left,
+      y: evt.clientY - rect.top
+    };
+}
+function getAvailableMove(entry, boardData, width, height) {
+    var moves = [];
+    if (!entry.valid) {
+        return moves;
+    }
+    var entryRangeCheck = function(_x,_y) {
+        if (_x >= 0 && _x < width &&
+            _y >= 0 && _y < height) {
+                return true;
         }
-        return ret;
+        return false;
+    }
+    var entryCheck = function(_x,_y) {
+        if (!entryRangeCheck(_x,_y)) {
+            return false;
+        }
+        if (boardData[_y][_x] != 0) {
+            return false;
+        }
+        return true;
+    }
+    var x = entry.x;
+    var y = entry.y;
+    if (entryCheck(x+1,y)) {
+        if (entryCheck(x+2,y+1)) {
+            moves.push({x:x+2,y:y+1});
+        }
+        if (entryCheck(x+2,y-1)) {
+            moves.push({x:x+2,y:y-1});
+        }
+    }
+    if (entryCheck(x-1,y)) {
+        if (entryCheck(x-2,y+1)) {
+            moves.push({x:x-2,y:y+1});
+        }
+        if (entryCheck(x-2,y-1)) {
+            moves.push({x:x-2,y:y-1});
+        }
+    }
+    if (entryCheck(x,y+1)) {
+        if (entryCheck(x+1,y+2)) {
+            moves.push({x:x+1,y:y+2});
+        }
+        if (entryCheck(x-1,y+2)) {
+            moves.push({x:x-1,y:y+2});
+        }
+    }
+    if (entryCheck(x,y-1)) {
+        if (entryCheck(x+1,y-2)) {
+            moves.push({x:x+1,y:y-2});
+        }
+        if (entryCheck(x-1,y-2)) {
+            moves.push({x:x-1,y:y-2});
+        }
+    }
+    return moves;
 }
 
 
 
+
+function get2DArray(width, height) {
+    var ret = [];
+    for (var i = 0; i < height; i++) {
+        tmp = [];
+        for (var j = 0; j < width; j++) {
+            tmp.push(0);
+        }
+        ret.push(tmp);
+    }
+    return ret;
+}
+function mouseOverHandler(evt, gameArea) {
+    mouseMoveHandler(evt, gameArea);
+}
+
+function mouseMoveHandler(evt, gameArea) {
+    var entry = getMouseEntry(evt, gameArea);
+    if (entry.valid) {
+        //console.log("valid");
+    } else {
+        return;
+    }
+    if (gameArea.mouseEntry.x != entry.x ||
+        gameArea.mouseEntry.y != entry.y) {
+        //console.log("new entry");
+        //console.log(entry);
+        gameArea.mouseEntry.x = entry.x;
+        gameArea.mouseEntry.y = entry.y;
+        gameArea.mouseEntry.valid = true;
+        gameArea.update();
+    }
+    gameArea.update();
+}
+function mouseDownHandler(evt, gameArea) {
+    // main control
+    var entry = getMouseEntry(evt, gameArea);
+    if (entry.valid) {
+    } else {
+        return;
+    }
+    // check player move
+    var doPlayerMove = false;
+    var playerMoveCommand = {from:{x:gameArea.entrySelected.x,y:gameArea.entrySelected.y},to:{x:-1,y:-1}} 
+    for (var i = 0; i < gameArea.availableMove.length; i++) {
+        var x = parseInt(gameArea.availableMove[i].x);
+        var y = parseInt(gameArea.availableMove[i].y);
+        if (entry.x == x && entry.y == y) {
+             doPlayerMove = true;
+             playerMoveCommand.to.x = x;
+             playerMoveCommand.to.y = y;
+        }
+    }
+    if (doPlayerMove) {
+        var cmdValid = gameArea.playerMove(playerMoveCommand);
+        if (cmdValid) {
+            gameArea.entrySelected.valid = false;
+        }
+    } else {
+        // check correct player
+        if (gameArea.boardData[entry.y][entry.x] != gameArea.currentPlayer) {
+            return;
+        }
+        if (gameArea.entrySelected.x != entry.x ||
+            gameArea.entrySelected.y != entry.y) {
+            // if different then keep selected
+            gameArea.entrySelected.valid = true;
+        } else {
+            // if same then toggle
+            if (!gameArea.entrySelected.valid) {
+                gameArea.entrySelected.valid = true; // toggle
+            } else {
+                gameArea.entrySelected.valid = false;
+            }
+        }
+    }
+    gameArea.availableMove = getAvailableMove({x:entry.x,y:entry.y,valid:gameArea.entrySelected.valid},
+                                              gameArea.boardData,
+                                              gameArea.width,
+                                              gameArea.height);
+    gameArea.entrySelected.x = entry.x;
+    gameArea.entrySelected.y = entry.y;
+    gameArea.update();
+}
+function getMouseRelativePosition(evt, gameArea) {
+    var pos = {x: evt.clientX - gameArea.canvasOffset.x, y: evt.clientY - gameArea.canvasOffset.y};
+    return pos;
+}
+function getMouseEntry(evt, gameArea) {
+    var pos = getMouseRelativePosition(evt, gameArea);
+    var entry = {x:Math.floor((pos.x-1)/gameArea.blockSize),
+                 y:Math.floor((pos.y-1)/gameArea.blockSize)};
+    if (entry.x >= 0 && entry.x < gameArea.width &&
+        entry.y >= 0 && entry.y < gameArea.height) {
+        entry.valid = true;
+    } else {
+        entry.valid = false;
+    }
+    return entry;
+}
 
 
 function component(width, height, color, x, y) {
@@ -80,13 +446,23 @@ function component(width, height, color, x, y) {
     this.x = x;
     this.y = y;
     this.color = color;
-    //ctx = myGameArea.context;
-    //ctx.fillStyle = this.color;
-    //ctx.fillRect(this.x, this.y, this.width, this.height);
     this.update = function(){
         ctx = myGameArea.context;
         ctx.fillStyle = this.color;
         ctx.fillRect(this.x, this.y, this.width, this.height);
+    }
+}
+function circle(radius, color, centerX, centerY) {
+    this.r = radius;
+    this.x = centerX;
+    this.y = centerY;
+    this.color = color;
+    this.update = function(){
+        ctx = myGameArea.context;
+        ctx.beginPath();
+        ctx.arc(this.x, this.y, this.r, 0, 2*Math.PI, false);
+        ctx.fillStyle = this.color;
+        ctx.fill();
     }
 }
 
