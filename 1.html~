@@ -19,7 +19,7 @@ var myGamePiece;
 var myGameArea = {
     canvas : document.getElementById("canvas"),
     start : function() {
-        this.width = 4;
+        this.width = 5;
         this.height = 4;
         this.blockSize = 100;
         this.lineWidth = 5;
